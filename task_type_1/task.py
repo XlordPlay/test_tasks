@@ -6,74 +6,106 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.utils import resample
 import numpy as np
 
-#Load the training and testing data from CSV files (replace for u path)
-X_train = pd.read_csv('/home/xlordplay/test_tasks/task_type_1/train.csv')['email']
-y_train = pd.read_csv('/home/xlordplay/test_tasks/task_type_1/train.csv')['label']
-X_test = pd.read_csv('/home/xlordplay/test_tasks/task_type_1/test.csv')['email']
-y_test = pd.read_csv('/home/xlordplay/test_tasks/task_type_1/test.csv')['label']
+class DetectSpamModel:
+    def __init__(self, train_path, test_path):
+        """
+        Initialize the DetectSpamModel with paths to training and testing data.
+        
+        Parameters:
+            train_path (str): Path to the training data CSV file.
+            test_path (str): Path to the testing data CSV file.
+        """
+        self.train_path = train_path
+        self.test_path = test_path
+        self.vectorizer = TfidfVectorizer(stop_words='english')
+        self.lr_model = LogisticRegression(max_iter=1000, class_weight='balanced')
+        self.rf_model = RandomForestClassifier(n_estimators=100, random_state=42, class_weight='balanced')
+    
+    def load_data(self):
+        """Load training and testing data from CSV files."""
+        X_train = pd.read_csv(self.train_path)['email']
+        y_train = pd.read_csv(self.train_path)['label']
+        X_test = pd.read_csv(self.test_path)['email']
+        y_test = pd.read_csv(self.test_path)['label']
+        
+        return X_train, y_train, X_test, y_test
 
-#Handle missing values by filling them with an empty string
-X_train = X_train.fillna("")
-y_train = y_train.fillna("")
-X_test = X_test.fillna("")
-y_test = y_test.fillna("")
+    def preprocess_data(self, X_train, y_train, X_test):
+        """Preprocess the data by handling missing values and balancing the dataset."""
+        # Fill missing values
+        X_train = X_train.fillna("")
+        y_train = y_train.fillna("")
+        X_test = X_test.fillna("")
 
-#Combine the training data into a single DataFrame for easier manipulation
-train_data = pd.DataFrame({'text': X_train, 'label': y_train})
+        # Combine training data into a DataFrame
+        train_data = pd.DataFrame({'text': X_train, 'label': y_train})
 
-#Separate the data into 'ham' and 'spam' categories for balancing
-ham = train_data[train_data['label'] == 'ham']
-spam = train_data[train_data['label'] == 'spam']
+        # Separate 'ham' and 'spam'
+        ham = train_data[train_data['label'] == 'ham']
+        spam = train_data[train_data['label'] == 'spam']
 
-#Perform oversampling on the 'spam' class to balance the dataset
-spam_oversampled = resample(spam, 
-                            replace=True,      # Allow replacement to create new samples
-                            n_samples=len(ham),    # Match the number of 'ham' samples
-                            random_state=42)  # Set seed for reproducibility
+        # Oversample 'spam' class
+        spam_oversampled = resample(spam, 
+                                    replace=True,     
+                                    n_samples=len(ham),    
+                                    random_state=42)
 
-#Combine the balanced 'ham' and oversampled 'spam' back into a single DataFrame
-train_data_balanced = pd.concat([ham, spam_oversampled])
+        # Combine back into a balanced DataFrame
+        train_data_balanced = pd.concat([ham, spam_oversampled])
 
-#Create a TF-IDF vectorizer to convert text data into numerical format
-vectorizer = TfidfVectorizer(stop_words='english')
+        # Fit and transform the balanced dataset
+        X_resampled = self.vectorizer.fit_transform(train_data_balanced['text'])
+        y_resampled = train_data_balanced['label'].map({'ham': 0, 'spam': 1})
 
-#Fit and transform the balanced training data into TF-IDF format
-X_resampled = vectorizer.fit_transform(train_data_balanced['text'])
+        # Transform the test set
+        X_test_vectorized = self.vectorizer.transform(X_test)
 
-#Map labels to numerical values: 'ham' -> 0 and 'spam' -> 1
-y_resampled = train_data_balanced['label'].map({'ham': 0, 'spam': 1})
+        return X_resampled, y_resampled, X_test_vectorized
 
-#Transform the test data using the same vectorizer
-X_test_vectorized = vectorizer.transform(X_test)
+    def train_models(self, X_resampled, y_resampled):
+        """Train Logistic Regression and Random Forest models."""
+        self.lr_model.fit(X_resampled, y_resampled)
+        self.rf_model.fit(X_resampled, y_resampled)
 
-#Train a Logistic Regression model with balanced class weights
-lr_model = LogisticRegression(max_iter=1000, class_weight='balanced')
-lr_model.fit(X_resampled, y_resampled)
+    def predict_and_evaluate(self, X_test_vectorized, y_test):
+        """Predict using the trained models and evaluate their performance."""
+        # Set a threshold for classification
+        threshold = 0.36
+        y_test_prob = (self.lr_model.predict_proba(X_test_vectorized)[:, 1] + 
+                       self.rf_model.predict_proba(X_test_vectorized)[:, 1]) / 2
 
-#Train a Random Forest Classifier with balanced class weights
-rf_model = RandomForestClassifier(n_estimators=100, random_state=42, class_weight='balanced')
-rf_model.fit(X_resampled, y_resampled)
+        # Assign predictions based on the threshold
+        y_test_pred = np.where(y_test_prob > threshold, 'spam', 'ham')
 
-#Adjust the threshold to control sensitivity
-threshold = 0.36
+        # Calculate accuracy
+        test_accuracy = accuracy_score(y_test, y_test_pred)
+        print("Test Accuracy:", test_accuracy)
 
-#Compute average predicted probabilities for the test set from both models
-y_test_prob = (lr_model.predict_proba(X_test_vectorized)[:, 1] + rf_model.predict_proba(X_test_vectorized)[:, 1]) / 2
+        # Display confusion matrix
+        print("Confusion Matrix (Test):")
+        print(confusion_matrix(y_test, y_test_pred))
 
-# Classify as 'spam' if probability exceeds the threshold, otherwise 'ham'
-y_test_pred = np.where(y_test_prob > threshold, 'spam', 'ham')
+        # Output classification report
+        print("Classification Report:")
+        print(classification_report(y_test, y_test_pred))
 
-#Calculate the accuracy of the predictions
-test_accuracy = accuracy_score(y_test, y_test_pred)  
-print("Test Accuracy:", test_accuracy)
+    def run(self):
+        """Execute the full pipeline: load data, preprocess, train, and evaluate."""
+        # Load data
+        X_train, y_train, X_test, y_test = self.load_data()
 
-#Display the confusion matrix for the test predictions
-print("Confusion Matrix (Test):")
-print(confusion_matrix(y_test, y_test_pred))
+        # Preprocess data
+        X_resampled, y_resampled, X_test_vectorized = self.preprocess_data(X_train, y_train, X_test)
 
-#Output a detailed classification report including precision, recall, and F1-score
-print("Classification Report:")
-print(classification_report(y_test, y_test_pred))
+        # Train models
+        self.train_models(X_resampled, y_resampled)
+
+        # Predict and evaluate
+        self.predict_and_evaluate(X_test_vectorized, y_test)
+
+
+spam_detector = DetectSpamModel('/home/xlordplay/test_tasks/task_type_1/train.csv', '/home/xlordplay/test_tasks/task_type_1/test.csv')
+spam_detector.run()
 
 
 """
