@@ -32,32 +32,32 @@ class DetectSpamModel:
 
     def preprocess_data(self, X_train, y_train, X_test):
         """Preprocess the data by handling missing values and balancing the dataset."""
-        # Fill missing values
+        #Fill missing values
         X_train = X_train.fillna("")
         y_train = y_train.fillna("")
         X_test = X_test.fillna("")
 
-        # Combine training data into a DataFrame
+        #Combine training data into a DataFrame
         train_data = pd.DataFrame({'text': X_train, 'label': y_train})
 
-        # Separate 'ham' and 'spam'
+        #Separate 'ham' and 'spam'
         ham = train_data[train_data['label'] == 'ham']
         spam = train_data[train_data['label'] == 'spam']
 
-        # Oversample 'spam' class
+        #Oversample 'spam' class
         spam_oversampled = resample(spam, 
                                     replace=True,     
                                     n_samples=len(ham),    
                                     random_state=42)
 
-        # Combine back into a balanced DataFrame
+        #Combine back into a balanced DataFrame
         train_data_balanced = pd.concat([ham, spam_oversampled])
 
-        # Fit and transform the balanced dataset
+        #Fit and transform the balanced dataset
         X_resampled = self.vectorizer.fit_transform(train_data_balanced['text'])
         y_resampled = train_data_balanced['label'].map({'ham': 0, 'spam': 1})
 
-        # Transform the test set
+        #Transform the test set
         X_test_vectorized = self.vectorizer.transform(X_test)
 
         return X_resampled, y_resampled, X_test_vectorized
@@ -69,23 +69,23 @@ class DetectSpamModel:
 
     def predict_and_evaluate(self, X_test_vectorized, y_test):
         """Predict using the trained models and evaluate their performance."""
-        # Set a threshold for classification
+        #Set a threshold for classification
         threshold = 0.36
         y_test_prob = (self.lr_model.predict_proba(X_test_vectorized)[:, 1] + 
                        self.rf_model.predict_proba(X_test_vectorized)[:, 1]) / 2
 
-        # Assign predictions based on the threshold
+        #Assign predictions based on the threshold
         y_test_pred = np.where(y_test_prob > threshold, 'spam', 'ham')
 
-        # Calculate accuracy
+        #accuracy
         test_accuracy = accuracy_score(y_test, y_test_pred)
         print("Test Accuracy:", test_accuracy)
 
-        # Display confusion matrix
+        #confusion matrix
         print("Confusion Matrix (Test):")
         print(confusion_matrix(y_test, y_test_pred))
 
-        # Output classification report
+        #classification report
         print("Classification Report:")
         print(classification_report(y_test, y_test_pred))
 

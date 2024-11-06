@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Поиск документов</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="file"],
+        input[type="text"],
+        input[type="submit"] {
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        input[type="submit"] {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        input[type="submit"]:hover {
+            background-color: #218838;
+        }
+        .results {
+            margin-top: 20px;
+        }
+        .result-item {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            background-color: #f9f9f9;
+        }
+        .score {
+            font-weight: bold;
+            color: #007bff;
+        }
+        .metrics {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #e7f3fe;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Поиск документов</h1>
+        <form method="POST" enctype="multipart/form-data">
+            {{ form.hidden_tag() }}
+            <label for="file">{{ form.file.label }}</label>
+            {{ form.file() }}
+            <label for="search_query">{{ form.search_query.label }}</label>
+            {{ form.search_query() }}
+            {{ form.submit() }}
+        </form>
+
+        {% if results %}
+        <div class="results">
+            <h2>Результаты поиска:</h2>
+            {% for doc, score, label in results %}
+            <div class="result-item">
+                <p>{{ doc }}</p>
+                <p class="score">Балл: {{ score }}</p>
+                <p>Метка: {{ label }}</p>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if metrics %}
+        <div class="metrics">
+            <h3>Метрики качества поиска:</h3>
+            <p>Точность: {{ metrics.precision | round(2) }}</p>
+            <p>Полнота: {{ metrics.recall | round(2) }}</p>
+            <p>F1-мера: {{ metrics.f1_score | round(2) }}</p>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
